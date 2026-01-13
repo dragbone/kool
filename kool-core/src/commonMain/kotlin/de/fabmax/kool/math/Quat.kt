@@ -244,6 +244,24 @@ open class QuatF(open val x: Float, open val y: Float, open val z: Float, open v
         fun rotation(angle: AngleF, axis: Vec3f): QuatF = MutableQuatF().set(angle, axis)
 
         fun exponent(log: Vec3f, multiplier: Float = 1.0f): QuatF = MutableQuatF().setExponent(log, multiplier)
+
+        fun lookAt(forward: Vec3f, up: Vec3f): QuatF {
+            val nForward = MutableVec3f(forward).norm()
+            val nUp = MutableVec3f(up).normed()
+            val nSide = nForward.cross(nUp, MutableVec3f()).norm()
+            nSide.cross(nForward, nUp).norm()
+            val trace = nForward.x + nUp.y + nSide.z
+            if (abs(trace) > 0.0001f) {
+                val s = 0.5f / sqrt(trace + 1.0f)
+                return QuatF(
+                    (nUp.z - nSide.y) * s,
+                    (nSide.x - nForward.z) * s,
+                    (nForward.y - nUp.x) * s,
+                    0.25f / s
+                )
+            }
+            return IDENTITY
+        }
     }
 }
 
@@ -646,6 +664,24 @@ open class QuatD(open val x: Double, open val y: Double, open val z: Double, ope
         fun rotation(angle: AngleD, axis: Vec3d): QuatD = MutableQuatD().set(angle, axis)
 
         fun exponent(log: Vec3d, multiplier: Double = 1.0): QuatD = MutableQuatD().setExponent(log, multiplier)
+
+        fun lookAt(forward: Vec3d, up: Vec3d): QuatD {
+            val nForward = MutableVec3d(forward).norm()
+            val nUp = MutableVec3d(up).normed()
+            val nSide = nForward.cross(nUp, MutableVec3d()).norm()
+            nSide.cross(nForward, nUp).norm()
+            val trace = nForward.x + nUp.y + nSide.z
+            if (abs(trace) > 9.999999747378752E-5) {
+                val s = 0.5 / sqrt(trace + 1.0)
+                return QuatD(
+                    (nUp.z - nSide.y) * s,
+                    (nSide.x - nForward.z) * s,
+                    (nForward.y - nUp.x) * s,
+                    0.25 / s
+                )
+            }
+            return IDENTITY
+        }
     }
 }
 

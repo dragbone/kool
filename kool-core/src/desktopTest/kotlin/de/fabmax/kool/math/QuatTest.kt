@@ -21,7 +21,7 @@ class QuatTest {
 
     @Test
     fun exponentAndLogarithmAreInvertible() {
-        for(log in testVectors) {
+        for (log in testVectors) {
             val q = QuatD.exponent(log)
             val restoredLog = q.log()
             assert(log.isFuzzyEqual(restoredLog, 1e-15))
@@ -30,7 +30,7 @@ class QuatTest {
 
     @Test
     fun exponentAndNaiveExponentAreTheSame() {
-        for(log in testVectors) {
+        for (log in testVectors) {
             val qD = QuatD.exponent(log)
             val qF = QuatF.exponent(log.toVec3f())
             val qNaive = naiveExponent(log)
@@ -41,7 +41,7 @@ class QuatTest {
 
     @Test
     fun quaternionPow() {
-        for(log in testVectors) {
+        for (log in testVectors) {
             val q = QuatD.exponent(log)
 
             assert(q.pow(-1.0).isFuzzyEqual(q.inverted(), 1e-15))
@@ -84,7 +84,7 @@ class QuatTest {
 
     @Test
     fun exponentAndMultiplier() {
-        for(log in testVectors) {
+        for (log in testVectors) {
             val q = QuatD.exponent(log)
 
             val q2 = QuatD.exponent(log, 2.0)
@@ -95,6 +95,22 @@ class QuatTest {
         }
     }
 
+    @Test
+    fun lookAtSimple() {
+        val q = QuatF.lookAt(Vec3f.Z_AXIS, Vec3f.Y_AXIS)
+        val c = QuatF.rotation((-90f).deg, Vec3f.Y_AXIS)
+        assert(c.isFuzzyEqual(q, 1e-15f))
+    }
+
+    @Test
+    fun lookAtComplex() {
+        val q = QuatF.lookAt(Vec3f.ONES, Vec3f.Y_AXIS)
+        val q_ = q.inverted()
+        val v = QuatF(1f,0f,0f,0f)
+        println(q * v * q_)
+        println(q_ * v * q)
+    }
+
     private fun naiveExponent(v: Vec3d): QuatD {
         val q = QuatD(v.x, v.y, v.z, 0.0)
         val seriesSum = MutableQuatD().setIdentity()
@@ -102,7 +118,7 @@ class QuatTest {
         val qN = MutableQuatD().setIdentity()
         var factorial = 1.0
 
-        for(i in 1 .. 100) {
+        for (i in 1..100) {
             qN *= q
             factorial *= i
 
@@ -115,7 +131,7 @@ class QuatTest {
             seriesSum += sumElement
         }
 
-        assert(isFuzzyEqual(seriesSum.length(), 1.0, 1e-15)) { "seriesSum.length() = ${seriesSum.length()}"}
+        assert(isFuzzyEqual(seriesSum.length(), 1.0, 1e-15)) { "seriesSum.length() = ${seriesSum.length()}" }
         return seriesSum
     }
 
