@@ -25,9 +25,9 @@ kotlin {
 //            api(npm(File("$projectDir/npm/physx-js-webidl")))
         }
 
-//        androidMain.dependencies {
-//            api(libs.physx.android)
-//        }
+        androidMain.dependencies {
+            api(libs.physx.android)
+        }
     }
 }
 

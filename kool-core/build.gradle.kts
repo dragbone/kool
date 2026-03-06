@@ -41,20 +41,21 @@ kotlin {
             implementation(npm("jszip", "3.10.1"))
         }
 
-//        androidMain.dependencies {
-//            implementation(libs.androidsvg)
-//        }
+        androidMain.dependencies {
+            implementation(libs.androidsvg)
+        }
     }
 }
 
-//android {
-//    externalNativeBuild {
-//        cmake {
-//            path = file("src/androidMain/cpp/CMakeLists.txt")
-//            version = "3.22.1"
-//        }
-//    }
-//}
+android {
+    externalNativeBuild {
+        cmake {
+            path = file("src/androidMain/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    ndkVersion = "29.0.14206865"
+}
 
 tasks["clean"].dependsOn("deleteExtras")
 tasks.register<Delete>("deleteExtras") {
