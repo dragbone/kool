@@ -36,19 +36,14 @@ class ModelTemplate(val scene: GltfScene, val gltfFile: GltfFile) : BaseReleasab
         return ModelGenerator().makeModel(cfg)
     }
 
-    private inner class ModelGenerator {
+    private inner class ModelGenerator(val cfg: GltfLoadConfig) {
         val modelAnimations = mutableListOf<Animation>()
         val modelNodes = mutableMapOf<GltfNode, Node>()
         val meshesByMaterial = mutableMapOf<Int, MutableSet<Mesh<*>>>()
         val meshMaterials = mutableMapOf<Mesh<*>, GltfMaterial?>()
 
-        val animations get() = gltfFile.animations
-        val skins get() = gltfFile.skins
-        val accessors get() = gltfFile.accessors
-        val nodes get() = gltfFile.nodes
-
-        fun makeModel(cfg: GltfLoadConfig): Model {
-            val model = Model(name)
+        fun makeModel(scene: GltfScene): Model {
+            val model = Model(scene.name ?: "model_scene")
             scene.nodeRefs.forEach { nd -> model += nd.makeNode(model, cfg) }
 
             if (cfg.loadAnimations) makeTrsAnimations()
@@ -365,7 +360,7 @@ class ModelTemplate(val scene: GltfScene, val gltfFile: GltfFile) : BaseReleasab
         }
 
         private fun Node.mergeMeshesByMaterial() {
-            children.filter { it.children.isNotEmpty() }.forEach { it.mergeMeshesByMaterial() }
+            children.filter{ it.children.isNotEmpty() }.forEach { it.mergeMeshesByMaterial() }
 
             meshesByMaterial.values.forEach { sameMatMeshes ->
                 val mergeMeshes = children.filter { it in sameMatMeshes }.map { it as Mesh<*> }
@@ -441,7 +436,7 @@ class ModelTemplate(val scene: GltfScene, val gltfFile: GltfFile) : BaseReleasab
         private fun GltfNode.createMeshes(model: Model, nodeGrp: Node, cfg: GltfLoadConfig) {
             meshRef?.primitives?.forEachIndexed { index, prim ->
                 val name = "${meshRef?.name ?: "${nodeGrp.name}.mesh"}_$index"
-                val geometry = geometryCache.getOrPut(name) { prim.toGeometry(cfg, accessors) }
+                val geometry = prim.toGeometry(cfg, accessors)
                 if (!geometry.isEmpty()) {
                     var isFrustumChecked = true
                     var meshSkin: Skin? = null
@@ -457,7 +452,7 @@ class ModelTemplate(val scene: GltfScene, val gltfFile: GltfFile) : BaseReleasab
                     }
 
                     val instances = cfg.instanceLayout?.let { MeshInstanceList(it) }
-                    val mesh = Mesh(geometry = geometry, instances = instances, morphWeights = morphWeights, skin = meshSkin, name = name)
+                    val mesh = Mesh(geometry, instances = instances, morphWeights = morphWeights, skin = meshSkin, name = name)
                     mesh.isFrustumChecked = isFrustumChecked
 
                     nodeGrp += mesh
@@ -473,25 +468,21 @@ class ModelTemplate(val scene: GltfScene, val gltfFile: GltfFile) : BaseReleasab
                     meshMaterials[mesh] = prim.materialRef
 
                     if (cfg.applyMaterials) {
-                        val (shader, depthShader) = shaderCache.getOrPut(name) {
-                            makeKslMaterial(prim, mesh, cfg)
-                        }
-                        mesh.shader = shader
-                        mesh.depthShaderConfig = depthShader
+                        makeKslMaterial(prim, mesh, cfg, model)
                     }
                     model.meshes[name] = mesh
                 }
             }
         }
 
-        private fun makeKslMaterial(prim: GltfMesh.Primitive, mesh: Mesh<*>, cfg: GltfLoadConfig): Pair<KslShader, DepthShader.Config?> {
+        private fun makeKslMaterial(prim: GltfMesh.Primitive, mesh: Mesh<*>, cfg: GltfLoadConfig, model: Model) {
             var isDeferred = cfg.materialConfig.isDeferredShading
             val useVertexColor = prim.attributes.containsKey(GltfMesh.Primitive.ATTRIBUTE_COLOR_0)
 
             val pbrConfig = DeferredKslPbrShader.Config.Builder().apply {
                 val material = prim.materialRef
                 if (material != null) {
-                    material.applyTo(this, useVertexColor, gltfFile, cfg.assetLoader ?: Assets.defaultLoader)
+                    material.applyTo(this, useVertexColor, this@GltfFile, cfg.assetLoader ?: Assets.defaultLoader)
                 } else {
                     color {
                         uniformColor(Color.GRAY.toLinear())
@@ -510,7 +501,7 @@ class ModelTemplate(val scene: GltfScene, val gltfFile: GltfFile) : BaseReleasab
                             enableArmature(mesh.skin.nodes.size)
                         }
                         if (cfg.materialConfig.fixedNumberOfJoints > 0 && cfg.materialConfig.fixedNumberOfJoints < mesh.skin.nodes.size) {
-                            logW("GltfFile") { "\"${this@ModelTemplate.name}\": Number of joints exceeds the material config's fixedNumberOfJoints (mesh has ${mesh.skin.nodes.size}, materialConfig.fixedNumberOfJoints is ${cfg.materialConfig.fixedNumberOfJoints})" }
+                            logW("GltfFile") { "\"${model.name}\": Number of joints exceeds the material config's fixedNumberOfJoints (mesh has ${mesh.skin.nodes.size}, materialConfig.fixedNumberOfJoints is ${cfg.materialConfig.fixedNumberOfJoints})" }
                         }
                     }
                     if (mesh.morphWeights != null) {
@@ -540,30 +531,30 @@ class ModelTemplate(val scene: GltfScene, val gltfFile: GltfFile) : BaseReleasab
                     isDeferred = false
                 }
 
-                colorCfg.primaryTexture?.defaultTexture?.let { textures[it.name] = it }
-                emissionCfg.primaryTexture?.defaultTexture?.let { textures[it.name] = it }
-                normalMapCfg.defaultNormalMap?.let { textures[it.name] = it }
-                roughnessCfg.primaryTexture?.defaultTexture?.let { textures[it.name] = it }
-                metallicCfg.primaryTexture?.defaultTexture?.let { textures[it.name] = it }
-                aoCfg.primaryTexture?.defaultTexture?.let { textures[it.name] = it }
-                vertexCfg.displacementCfg.primaryTexture?.defaultTexture?.let { textures[it.name] = it }
+                colorCfg.primaryTexture?.defaultTexture?.let { model.textures[it.name] = it }
+                emissionCfg.primaryTexture?.defaultTexture?.let { model.textures[it.name] = it }
+                normalMapCfg.defaultNormalMap?.let { model.textures[it.name] = it }
+                roughnessCfg.primaryTexture?.defaultTexture?.let { model.textures[it.name] = it }
+                metallicCfg.primaryTexture?.defaultTexture?.let { model.textures[it.name] = it }
+                aoCfg.primaryTexture?.defaultTexture?.let { model.textures[it.name] = it }
+                vertexCfg.displacementCfg.primaryTexture?.defaultTexture?.let { model.textures[it.name] = it }
             }
 
-            val shader = if (isDeferred) {
+            mesh.shader = if (isDeferred) {
                 pbrConfig.pipelineCfg.blendMode = BlendMode.DISABLED
                 DeferredKslPbrShader(pbrConfig.build())
             } else {
                 KslPbrShader(pbrConfig.build())
             }
-            val depthShader = if (pbrConfig.alphaMode is AlphaMode.Mask) {
-                DepthShader.Config.forMesh(
+
+            if (pbrConfig.alphaMode is AlphaMode.Mask) {
+                mesh.depthShaderConfig = DepthShader.Config.forMesh(
                     mesh,
                     pbrConfig.pipelineCfg.cullMethod,
                     pbrConfig.alphaMode,
                     pbrConfig.colorCfg.primaryTexture?.defaultTexture
                 )
-            } else null
-            return Pair(shader, depthShader)
+            }
         }
     }
 }
